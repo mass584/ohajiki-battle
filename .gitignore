@@ -1,0 +1,33 @@
+# macOS が勝手に作るもの。Finder でフォルダを開いただけで生えるので、
+# 公開リポジトリでいちばん事故りやすい
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# エディタ・IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# 秘密情報。この作品は今のところ何も持たないが、サーバーを足したときに
+# うっかり入れないよう先に塞いでおく
+.env
+.env.*
+*.pem
+*.key
+*.p12
+secrets.json
+credentials.json
+
+# サーバー実装を足したとき用
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# 手元だけの作業ファイル
+*.local
+*.local.*
+scratch/
+tmp/
