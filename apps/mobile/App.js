@@ -4,8 +4,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
 import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
-import { Audio } from 'expo-av';
+import { File } from 'expo-file-system';
+import { setAudioModeAsync } from 'expo-audio';
 
 // ゲーム本体は「外部リソース 0 の自己完結 HTML」。scripts/inline.mjs が
 // index.html から生成した assets/game.html を同梱し、オフラインで読み込む。
@@ -30,10 +30,11 @@ export default function App() {
       try {
         // WKWebView の音声はアプリ共有の AudioSession に従う。ここを playback に
         // しておくと、マナーモードでも BGM/効果音（Web Audio）が鳴る。
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: false,
+          interruptionMode: 'duckOthers',
+          allowsRecording: false,
         });
       } catch (e) {
         // 音の設定に失敗しても、ゲーム自体は続行する
@@ -41,7 +42,7 @@ export default function App() {
       const asset = Asset.fromModule(GAME_HTML);
       await asset.downloadAsync();
       const uri = asset.localUri || asset.uri;
-      const text = await FileSystem.readAsStringAsync(uri);
+      const text = await new File(uri).text();
       setHtml(text);
     })();
   }, []);

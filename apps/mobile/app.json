@@ -7,26 +7,29 @@
     "scheme": "ohajiki",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0c120e",
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#0c120e"
-    },
-    "assetBundlePatterns": ["assets/**/*"],
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "io.github.mass584.ohajikibattle",
-      "infoPlist": {
-        "UIRequiresFullScreen": true
-      }
+      "requireFullScreen": true
     },
     "android": {
       "package": "io.github.mass584.ohajikibattle"
     },
     "plugins": [
       [
-        "expo-av",
+        "expo-audio",
         {
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0c120e",
+          "resizeMode": "contain"
         }
       ]
     ]

@@ -10,14 +10,19 @@
   WebView は `file://` 越しに ES モジュールを読めない（CORS）ため、同梱版は 1 枚にまとめる。
 - `App.js` がその HTML を読み込み、安定した `baseUrl`（`https://ohajiki.local/`）で WebView に渡す。
   記録は WebView 内の `localStorage`（キー `ohajiki.save`）にオリジン単位で永続化される。
-- iOS の消音スイッチ対策として、起動時に `Audio.setAudioModeAsync({ playsInSilentModeIOS: true })` で
+- iOS の消音スイッチ対策として、起動時に `expo-audio` の `setAudioModeAsync({ playsInSilentMode: true })` で
   アプリ共有の AVAudioSession を playback にし、マナーモードでも Web Audio（BGM/効果音）が鳴るようにする。
 - Android のハード戻るボタンは、単一画面のため「アプリ終了の確認」を挟む。
 - バックグラウンド移行時に `visibilitychange` を WebView へ発火させ、記録の取りこぼしを防ぐ。
 
 ## 開発手順
 
-前提: Node 18+、`pnpm i`（リポジトリ直下）で依存を入れる。iOS は macOS + Xcode、Android は Android Studio。
+前提: Expo SDK 57 / React Native 0.86（New Architecture）。Node と pnpm の版はリポジトリ直下の
+`.tool-versions` に固定してある（asdf 前提。無い場合は Node 20+ / pnpm 10+）。`pnpm i`（リポジトリ直下）で
+依存を入れる。iOS は macOS + Xcode + CocoaPods、Android は Android SDK + JDK 17。
+
+> pnpm は Expo/RN 向けに `.npmrc` の `node-linker=hoisted` で npm 互換の平坦な `node_modules` にしている
+> （autolinking と CocoaPods がシンボリックリンク構成を解決できないため）。
 
 ```sh
 cd apps/mobile

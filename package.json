@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "おはじきバトル — Web ゲーム + 共有 sim + ネイティブ(WebView)アプリのモノレポ",
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@11.12.0",
   "scripts": {
     "test:sim": "node packages/sim/test/selfplay.js",
     "build:standalone": "node scripts/inline.mjs",
