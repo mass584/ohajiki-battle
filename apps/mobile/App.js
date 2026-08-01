@@ -19,28 +19,12 @@ const BASE_URL = 'https://ohajiki.local/';
 // 盤面の暗い背景に合わせる（ロード中やセーフエリア外の色）
 const BG = '#0c120e';
 
-// WebView は viewport に user-scalable=no / maximum-scale が無いと「ダブルタップで拡大」が
-// 有効なままになる。盤面の canvas は touch-action:none（index.html:36）なので免れているが、
-// HUD のボタンには指定が無く、2 回叩くとページごと拡大してしまう。
-// ゲーム本体は無改造の方針なので、アプリ側で塞ぐ。
-//
-// touch-action:manipulation の注入だけでは WKWebView のダブルタップ拡大は止まらず、
-// 読み込み後に viewport meta を書き換えても効かなかった（WKWebView は解析時点の
-// viewport でスケール制限を決めるため）。そこで WebView に渡す HTML 文字列の段階で
-// viewport を差し替える。react-native-webview は ignoresViewportScaleLimits を
-// 触っていない（既定 NO）ので、WKWebView はこの maximum-scale / user-scalable を尊重する。
-// ゲーム本体のファイルは無改造のまま、メモリ上の複製だけを書き換える。
-const VIEWPORT_RE = /<meta\s+name=["']viewport["'][^>]*>/i;
-const VIEWPORT_FIXED =
-  '<meta name="viewport" content="width=device-width, initial-scale=1, ' +
-  'minimum-scale=1, maximum-scale=1, user-scalable=no">';
-
-// ブラウザ側のズームを殺すだけで、ゲーム自前のピンチズーム（canvas 上の
-// touch イベント実装）には影響しない。あわせてタップ遅延も消す。
-const DISABLE_DOUBLE_TAP_ZOOM = `
+// ダブルタップ拡大の抑止（viewport の maximum-scale / user-scalable）は
+// index.html 側で対応済みなので、アプリ側での書き換えは持たない。
+// タップ遅延の除去だけ CSS で足す（canvas は元の touch-action:none を維持）。
+const KILL_TAP_DELAY = `
   (function () {
     var s = document.createElement('style');
-    // canvas は元の touch-action:none を維持する（* に負けない型セレクタだが明示しておく）
     s.textContent = '*{touch-action:manipulation}canvas{touch-action:none}';
     (document.head || document.documentElement).appendChild(s);
   })();
@@ -71,7 +55,7 @@ export default function App() {
       await asset.downloadAsync();
       const uri = asset.localUri || asset.uri;
       const text = await new File(uri).text();
-      setHtml(text.replace(VIEWPORT_RE, VIEWPORT_FIXED));
+      setHtml(text);
     })();
   }, []);
 
@@ -115,7 +99,7 @@ export default function App() {
               originWhitelist={['*']}
               source={{ html, baseUrl: BASE_URL }}
               // 描画・入力
-              injectedJavaScript={DISABLE_DOUBLE_TAP_ZOOM}
+              injectedJavaScript={KILL_TAP_DELAY}
               javaScriptEnabled
               domStorageEnabled                // Android: localStorage を有効化
               allowFileAccess
