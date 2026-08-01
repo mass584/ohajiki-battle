@@ -1,0 +1,16 @@
+# Expo / RN
+node_modules/
+.expo/
+dist/
+web-build/
+
+# ネイティブのプレビルド出力（expo prebuild で生成、コミットしない）
+/ios/
+/android/
+
+# scripts/inline.mjs が生成するゲーム本体（ビルド時に再生成）
+assets/game.html
+
+# 雑多
+*.log
+.DS_Store

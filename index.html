@@ -2,7 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- ブラウザ側のズームは切る。切らないと HUD のボタンを 2 回叩いたときに
+     ダブルタップ拡大が起きてしまう（盤面の canvas は touch-action:none で免れている）。
+     盤面の拡大はゲーム自前のピンチ／ズームボタンが受け持つので、機能は失われない -->
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
 <title>おはじきバトル</title>
 <!-- ファビコン。外部画像を持たない方針なので SVG を data URI で直に埋める。
      16px でも潰れないよう、外壁の環・中央の穴・向かい合う 2 つのコマだけに絞った。
@@ -197,26 +200,19 @@
 
   /* 下段右：操作パネル */
   .controls{
-    right:14px; bottom:74px;
+    right:14px; bottom:14px;
     display:flex; flex-direction:column; align-items:stretch; gap:8px;
     background:var(--panel); border:1px solid var(--line); border-radius:12px;
     padding:11px 13px; min-width:236px;
     backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
   }
-  /* 常時表示のズーム操作。スマホ・タブレットでも押しやすい大きさにする */
-  .zoomctl{
-    right:14px; bottom:14px;
-    display:flex; flex-direction:row; gap:8px;
-  }
-  .zoomctl button{
-    flex:0 0 auto; width:48px; height:48px; padding:0;
-    font-size:24px; line-height:1; font-weight:600;
-    border-radius:12px; background:var(--panel); border:1px solid var(--line);
-    display:flex; align-items:center; justify-content:center;
-    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-  }
-  .zoomctl button:disabled{opacity:.38; cursor:default}
   .controls .panel-body{display:flex; flex-direction:column; gap:8px}
+  /* ズームは視点の設定なので操作パネル内にまとめる。
+     パネルの中でも指で押せるよう、行幅いっぱいに広げて高さを確保する */
+  .controls .row.zoomrow button{
+    flex:1; height:38px; padding:0;
+    font-size:20px; line-height:1; font-weight:600;
+  }
   .controls .row{display:flex; align-items:center; gap:9px; font-size:11.5px; color:var(--dim)}
   .controls .row.btns{gap:7px}
   .readout{font-size:11px; color:var(--dim); letter-spacing:.03em; font-variant-numeric:tabular-nums}
@@ -499,6 +495,10 @@
         <input type="range" id="tilt" min="18" max="78" step="1" value="38">
         <span class="val" id="tiltVal">38°</span>
       </div>
+      <div class="row zoomrow"><span>ズーム</span>
+        <button id="zoomOut" aria-label="ズームアウト" title="ズームアウト (−)">－</button>
+        <button id="zoomIn" aria-label="ズームイン" title="ズームイン (＋)">＋</button>
+      </div>
       <div class="readout" id="readout">ZOOM 100%</div>
       <div class="row btns">
         <button id="resetView">視点リセット</button>
@@ -509,10 +509,6 @@
     </div>
   </div>
 
-  <div class="overlay zoomctl">
-    <button id="zoomOut" aria-label="ズームアウト" title="ズームアウト (−)">－</button>
-    <button id="zoomIn" aria-label="ズームイン" title="ズームイン (＋)">＋</button>
-  </div>
 </div>
 
 <dialog id="result">
@@ -891,6 +887,15 @@ let BASE_F = 1, BASE_OY = 0;     // 俯瞰角ごとの「ちょうど収まる�
 // 視点：ホイールでズーム、ドラッグで平行移動、スライダーで俯瞰角
 const VIEW = { zoom: 1, panX: 0, panY: 0, tilt: 38 };   // tilt は水平からの角度(度)
 
+// 画面の縦横比に合わせた既定の俯瞰角。寝かせたままだと盤面が横長の楕円に潰れ、
+// 縦長の画面では幅で頭打ちになって上下が大きく余る（スマホの縦持ちで顕著）。
+// 立てるほど盤面が丸くなり、縦の余白を使えるようになる。
+// 横長（従来のデスクトップ）では 38° のままで見た目は変わらない。
+function defaultTilt() {
+  const aspect = H / Math.max(1, W);
+  return Math.round(Math.max(38, Math.min(64, 38 + (aspect - 1) * 26)));
+}
+
 // いまの俯瞰角で盤面がキャンバスにちょうど収まる焦点距離と中心を求める
 function fitCamera() {
   const t = VIEW.tilt * Math.PI / 180;
@@ -910,7 +915,10 @@ function fitCamera() {
       nyMin = Math.min(nyMin, ny); nyMax = Math.max(nyMax, ny);
     }
   }
-  const m = 62;                    // まわりに背景が見える余白
+  // まわりに背景が見える余白。固定 62px だと幅 390pt のスマホでは左右で
+  // 画面幅の 3 割が余白に消えるので、狭い画面では画面サイズに比例させる
+  // （1440px 級のデスクトップでは従来どおり 62px になる）
+  const m = Math.max(14, Math.min(62, Math.min(W, H) * 0.08));
   BASE_F  = Math.min((W - 2 * m) / (2 * nxMax), (H - 2 * m) / (nyMax - nyMin));
   BASE_OY = (H - BASE_F * (nyMax - nyMin)) / 2 - BASE_F * nyMin;
 }
@@ -1579,7 +1587,7 @@ document.getElementById('toggleBgm').addEventListener('click', () => {
   if (MUSIC.on) musicStart(); else musicStop();
 });
 document.getElementById('resetView').addEventListener('click', () => {
-  VIEW.zoom = 1; VIEW.panX = 0; VIEW.panY = 0; setTilt(38);
+  VIEW.zoom = 1; VIEW.panX = 0; VIEW.panY = 0; setTilt(defaultTilt());
 });
 // 右下のズームボタン（キーボードの +/- と同じ刻み）
 function stepZoom(factor) {
@@ -5168,7 +5176,7 @@ window.addEventListener('keydown', ev => {
   else if (ev.key === 'ArrowDown'  || k === 's') VIEW.panY -= step;
   else if (ev.key === '+' || ev.key === '=') VIEW.zoom = Math.min(3.5, VIEW.zoom * 1.15);
   else if (ev.key === '-')          VIEW.zoom = Math.max(0.6, VIEW.zoom / 1.15);
-  else if (ev.key === '0')          { VIEW.zoom = 1; VIEW.panX = VIEW.panY = 0; VIEW.tilt = 38; }
+  else if (ev.key === '0')          { VIEW.zoom = 1; VIEW.panX = VIEW.panY = 0; VIEW.tilt = defaultTilt(); }
   else if (k === 'q') { ev.preventDefault(); setTilt(VIEW.tilt - 3); return; }
   else if (k === 'e') { ev.preventDefault(); setTilt(VIEW.tilt + 3); return; }
   else return;
@@ -5821,6 +5829,7 @@ window.__ohajiki = { get pieces(){ return M.pieces }, get phase(){ return M.phas
 
 // ---- 画面サイズに追従 -----------------------------------------------
 let resizeTimer = null;
+let tiltInit = false;       // 既定の俯瞰角を当てるのは初回の resize だけ
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   W = Math.max(320, cv.clientWidth);
@@ -5828,6 +5837,14 @@ function resize() {
   cv.width  = Math.round(W * DPR);
   cv.height = Math.round(H * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // 初回だけ画面の縦横比から俯瞰角を決める。以後は上書きしない
+  // （スライダーで動かした値をリサイズのたびに巻き戻さないため）
+  if (!tiltInit) {
+    tiltInit = true;
+    VIEW.tilt = defaultTilt();
+    const sl = document.getElementById('tilt');
+    if (sl) { sl.value = VIEW.tilt; document.getElementById('tiltVal').textContent = `${VIEW.tilt}°`; }
+  }
   TEX.bg = makeBackground();
   floorView = null; wallView = null;
   applyView();

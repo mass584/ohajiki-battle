@@ -1,0 +1,13 @@
+{
+  "name": "ohajiki-battle-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "おはじきバトル — Web ゲーム + 共有 sim + ネイティブ(WebView)アプリのモノレポ",
+  "packageManager": "pnpm@11.12.0",
+  "scripts": {
+    "test:sim": "node packages/sim/test/selfplay.js",
+    "build:standalone": "node scripts/inline.mjs",
+    "serve:web": "python3 -m http.server 8731"
+  },
+  "license": "SEE LICENSE IN LICENSE"
+}
