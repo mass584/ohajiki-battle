@@ -596,7 +596,7 @@
     右上の ↻ から対戦設定が開き、<b>2〜8人</b>の人数と<b>あなたの陣営</b>を選べます。<br>
     1P があなた、2P 以降は CPU です。<b>相手の陣営は毎回自動で割り振られます</b>（重複なし）。<br>
     CPU の強さも「よわい／ふつう／つよい」から選べます。<br>
-    駒の色と足元のリングがプレイヤー色です。<br>
+    駒の色と、HPバーの左のまるぽちがプレイヤー色です。<br>
     最後まで駒が残っていたプレイヤーの勝ちです。決着後は<b>順位表</b>が出ます。
     <h3>得点</h3>
     撃破×300 ／ 与えたダメージ×1 ／ 生き残った駒×150 ／ 残HP×0.5 ／ 最後まで残れば +1000。<br>
@@ -656,7 +656,7 @@ function newViewCanvas() {
 }
 
 // ---- チューニング値 -------------------------------------------------
-const R          = 33;     // コマ半径（盤面座標）※当たり判定そのもの。変えると対戦の中身が変わる
+const R          = 50;     // コマ半径（盤面座標）※当たり判定そのもの。変えると対戦の中身が変わる
 const PIECE_H    = 30;     // コマの厚み（見た目だけ。物理は一切参照しない）
 const MAX_HP     = 100;
 // ---- ステージ（形・穴・テーマ・滑りやすさ） --------------------------
@@ -997,12 +997,17 @@ const flySpeedOf = b => FLY_SPEED - (myBuff(b) ? BLESS.fly : 0);
 
 function makePieces() {
   const arr = [];
-  const spread = [-42, -14, 14, 42].map(v => v * 2 / M.players);   // 人数が増えるほど陣地は狭く
+  const stepDeg = 28 * 2 / M.players;                              // 隣り合う駒の角度差
+  const spread = [-1.5, -0.5, 0.5, 1.5].map(k => k * stepDeg);     // 人数が増えるほど陣地は狭く
+  // その角度差で駒が重ならないために要る配置半径。人数が多く、かつその向きの盤面が
+  // 狭いと radiusAt(a) - 230 では隣と 2R に届かず、初期配置から食い込む
+  const rMin = (2 * R + 14) / (stepDeg * Math.PI / 180);
   for (let owner = 0; owner < M.players; owner++) {
     const base = 180 + owner * 360 / M.players;                    // 円周に等分配置
     spread.forEach((d, k) => {
       const a = (base + d) * Math.PI / 180;
-      let dist = radiusAt(a) - 230;                              // 角のあるステージでも壁の内側に
+      const wall = radiusAt(a);                                  // 角のあるステージでも壁の内側に
+      let dist = Math.min(Math.max(wall - 230, rMin), wall - R - 20);
       if (M.ST.bumps) {                                            // バンパーに重なるなら手前へ寄せる
         for (let g = 0; g < 12; g++) {
           const x0 = Math.cos(a) * dist, y0 = Math.sin(a) * dist;
@@ -1289,6 +1294,19 @@ function toStage(ev) {
   return unproject(c.x, c.y);
 }
 
+// HP メーターの寸法。プレイヤー色のまるぽち＋横棒を、ひとまとまりで駒の真下に中央寄せする。
+// drawPiece() と pieceHitBox() の両方がこれを呼ぶ（片方だけ直して絵と判定がずれるのを防ぐ）
+// 全体（まるぽち＋棒）が駒の直径 2R に収まる幅にしてある。ここを広げると、
+// 駒が隣り合ったとき（＝盤面座標で 2R まで近づいたとき）バーが隣とつながって読めなくなる
+function hpBarGeom(rad, s) {
+  const w   = Math.max(20, rad * s * 1.8);      // 棒の長さ
+  const h   = Math.max(4, 5 * s);               // 棒の高さ
+  const dot = h * 0.7;                          // まるぽちの半径
+  const gap = Math.max(2, h * 0.5);             // まるぽちと棒のすき間
+  // まるぽちは棒より縦に張り出すので、下端は棒の高さでは足りない
+  return { w, h, dot, gap, total: dot * 2 + gap + w, bottom: Math.max(h, h / 2 + dot) };
+}
+
 // 画面に見えている姿で当たりを取る。
 // 盤面座標で「床の footprint から半径 R+8」で測っていた頃は、掴みたい所を押しても
 // 外れることが多かった。理由は2つあって、
@@ -1302,26 +1320,23 @@ function toStage(ev) {
 // 楕円ではなく矩形にしてあるのは、下端の HP メーターや円盤の側面の端が
 // 楕円だと外へこぼれるため（そこを押しても掴めないと操作感が悪い）
 function pieceHitBox(b) {
-  const boss = b.leader ? 1.13 : 1;
-  const rad  = R * boss;
-  const hgt  = PIECE_H * COLORS[b.fac].thick * boss;
+  const rad  = R;
+  const hgt  = PIECE_H * COLORS[b.fac].thick;
   const pb = project(b.x, b.y, 0);            // 底面（床に接する側）
   const pt = project(b.x, b.y, hgt);          // 天面
   const rxB = rad * pb.s, ryB = rxB * K2;
   const rxT = rad * pt.s, ryT = rxT * K2;
-  const fh  = FIG_TALL * pt.s * boss * (0.58 + 0.42 * K1);   // 立ち姿の背丈
+  const fh  = FIG_TALL * pt.s * (0.58 + 0.42 * K1);          // 立ち姿の背丈
   const fw  = fh * (FIG_W / FIG_H);
-  const orr = rad * project(b.x, b.y, 1).s * 1.5;            // 足元の所属リング
-  const barW = Math.max(20, rad * pb.s * 2.3);               // HP メーター
-  const barH = Math.max(4, 5 * pb.s);
+  const bar = hpBarGeom(rad, pb.s);                          // HP メーター（まるぽち込み）
 
   const cx = (pt.x + pb.x) / 2;
-  const halfW = Math.max(rxT, rxB, fw / 2, orr, barW / 2) + 3;
+  const halfW = Math.max(rxT, rxB, fw / 2, bar.total / 2) + 3;
   return {
     x0: cx - halfW,
     x1: cx + halfW,
     y0: pt.y + ryT * 0.35 - fh - 2,        // 立ち姿の頭
-    y1: pb.y + ryB + 5 + barH + 2,         // HP メーターの下端
+    y1: pb.y + ryB + 5 + bar.bottom + 2,   // HP メーターの下端
   };
 }
 
@@ -5270,8 +5285,10 @@ function drawPiece(b) {
   const falling = b.fall > 0;
   const shrink = falling ? Math.max(0, 1 - b.fall * 0.45) : 1;
   const z = falling ? -b.fall * 110 : b.air * 34;
-  const boss = b.leader ? 1.13 : 1;
-  const rad = R * shrink * boss, hgt = PIECE_H * mat.thick * shrink * boss;
+  // 隊長も一般兵と同じ大きさで描く。物理の当たり判定が全コマ一律 R なので、
+  // ここだけ隊長を 1.13 倍にすると「見えている円盤の縁に当てたのにスカる」ことになる。
+  // 隊長の見分けは冠・天面のチームカラーの輪・HP150 が担う
+  const rad = R * shrink, hgt = PIECE_H * mat.thick * shrink;
 
   const pb = project(b.x, b.y, z);
   const pt = project(b.x, b.y, z + hgt);
@@ -5350,14 +5367,14 @@ function drawPiece(b) {
   ctx.beginPath(); ctx.ellipse(pt.x, pt.y, rxT, ryT, 0, 0, Math.PI*2);
   ctx.strokeStyle = 'rgba(20,14,8,.7)'; ctx.lineWidth = 1.4; ctx.stroke();
   if (b.leader) {                                      // 隊長の輪もチームカラー
-    ctx.beginPath(); ctx.ellipse(pt.x, pt.y, rxT + 1.5, ryT + 1.5, 0, 0, Math.PI*2);
-    ctx.strokeStyle = c.lit; ctx.lineWidth = 2.4; ctx.stroke();
-    if (b.special) {                                   // 特殊が残っている合図
-      const k = 0.5 + 0.5 * Math.sin(performance.now() / 320);
-      ctx.beginPath(); ctx.ellipse(pt.x, pt.y, rxT + 5 + k * 3, (ryT + 5 + k * 3) * 1, 0, 0, Math.PI*2);
-      ctx.strokeStyle = c.main; ctx.globalAlpha = 0.3 + k * 0.4;
-      ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 1;
-    }
+    // 円盤の内側に収める。外へ出すと隊長だけ一回り大きく見えてしまい、
+    // 全コマ一律 R の当たり判定とずれて見える
+    const lw = Math.max(1.4, rxT * 0.1);
+    const k  = 1 - lw / Math.max(1, rxT);              // 線の外縁が天面の縁の内側に入る
+    ctx.beginPath(); ctx.ellipse(pt.x, pt.y, rxT * k, ryT * k, 0, 0, Math.PI*2);
+    // 白系（c.lit）だと、ホバーや選択の白い印と見分けがつかない。
+    // 白はクリックできる合図に取っておき、隊長の輪はチームカラーで示す
+    ctx.strokeStyle = c.main; ctx.lineWidth = lw; ctx.stroke();
   }
   if (b.shield > 0) {                                  // 聖盾
     const k = 0.5 + 0.5 * Math.sin(performance.now() / 300);
@@ -5380,7 +5397,7 @@ function drawPiece(b) {
 
   // 台座に立つキャラクター（カメラを向く板ポリ。俯瞰が強いほど少し縮む）
   {
-    const fh = FIG_TALL * pt.s * shrink * boss * (0.58 + 0.42 * K1);
+    const fh = FIG_TALL * pt.s * shrink * (0.58 + 0.42 * K1);
     const fw = fh * (FIG_W / FIG_H);
     ctx.save();
     if (b.x > 0) { ctx.translate(pt.x, 0); ctx.scale(-1, 1); ctx.translate(-pt.x, 0); }   // 中心を向かせる
@@ -5421,8 +5438,8 @@ function drawPiece(b) {
     ctx.beginPath(); ctx.ellipse(gp.x, gp.y, gr, gr * K2, 0, 0, Math.PI*2);
     ctx.strokeStyle = c.main; ctx.lineWidth = 3; ctx.shadowColor = c.glow;
     ctx.shadowBlur = 14; ctx.stroke(); ctx.shadowBlur = 0;
-    ctx.beginPath(); ctx.ellipse(pt.x, pt.y, rxT + 2.5, ryT + 2.5, 0, 0, Math.PI*2);
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    // 天面を白く縁取ると駒が一回り大きく見えるので、選択中の合図は
+    // 足元の輪と頭上の三角マーカーだけに任せる
     const ay = pt.y - ryT - 10 - k * 3;            // 上向きの三角マーカー
     ctx.beginPath();
     ctx.moveTo(pt.x, ay + 9); ctx.lineTo(pt.x - 6, ay); ctx.lineTo(pt.x + 6, ay);
@@ -5435,21 +5452,16 @@ function drawPiece(b) {
     ctx.fillStyle = `rgba(255,255,255,${b.flash * 0.65})`; ctx.fill();
   }
 
-  // 足元の所属リング（同じ陣営同士でも見分けられるように）
-  if (!falling) {
-    const op = project(b.x, b.y, 1);
-    const orr = rad * op.s * 1.5;
-    ctx.beginPath(); ctx.ellipse(op.x, op.y, orr, orr * K2, 0, 0, Math.PI*2);
-    ctx.strokeStyle = c.main;
-    ctx.lineWidth = Math.max(1, orr * 0.07); ctx.stroke();
-  }
-
-  // HPメーター（コマの手前下に横棒で）
+  // HPメーター（コマの手前下に横棒で）。左のまるぽちがプレイヤー色
+  // 足元にリングを敷くと土台（円盤）の大きさが読めなくなるので、所属はここで示す
   if (!falling) {
     const hp = Math.max(0, b.hp / b.maxHp);
-    const w = Math.max(20, rad * pb.s * 2.3);
-    const h = Math.max(4, 5 * pb.s);
-    const x0 = pb.x - w / 2, y0 = pb.y + ryB + 5;
+    const { w, h, dot, gap, total } = hpBarGeom(rad, pb.s);
+    const gx = pb.x - total / 2, y0 = pb.y + ryB + 5;
+    const x0 = gx + dot * 2 + gap;
+    ctx.beginPath(); ctx.arc(gx + dot, y0 + h / 2, dot, 0, Math.PI*2);
+    ctx.fillStyle = c.main; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.7)'; ctx.lineWidth = 1; ctx.stroke();
     ctx.fillStyle = 'rgba(0,0,0,.65)';
     ctx.fillRect(x0 - 1, y0 - 1, w + 2, h + 2);
     ctx.fillStyle = hp > 0.6 ? '#5ee08a' : hp > 0.3 ? '#ffd166' : '#ff6b6b';
