@@ -589,8 +589,9 @@
     <h3>ステージ</h3>
     対戦設定で8種類から選べます。形（円・六角・四角・八角・星形・歯車・花形）、穴の数と位置、床の滑りやすさが違います。<br>
     <b>氷湖の四角</b>はよく滑り、<b>砂漠の八角</b>は中央の穴が巨大。<br>
-    <b>星屑のピンボール</b>と<b>歯車工房</b>には弾き飛ばすバンパー、<b>渦の回廊</b>は穴が周回します。<br>
-    <b>終焉の大渦</b>は壁が脈動し、中心に引力が働き、ターンごとに中央の穴が広がっていきます。
+    <b>星屑のピンボール</b>と<b>歯車工房</b>には弾き飛ばすバンパー、<b>渦の回廊</b>は穴が4つあります。<br>
+    <b>終焉の大渦</b>では中心に引力が働きます。<br>
+    盤面そのもの（壁の形・穴の位置と大きさ）は、試合が終わるまで一切変わりません。
     <h3>陣営えらび</h3>
     右上の ↻ から対戦設定が開き、<b>2〜8人</b>の人数と<b>あなたの陣営</b>を選べます。<br>
     1P があなた、2P 以降は CPU です。<b>相手の陣営は毎回自動で割り振られます</b>（重複なし）。<br>
@@ -701,13 +702,10 @@ const STAGES = [
 
   { name:'終焉の大渦', sub:'MAELSTROM', sides:0, rot:0, r:1520, fric:0.993,
     wave:{ kind:'flower', n:8, amp:0.12 },
-    pulse:{ amp:0.07, spd:0.85 },          // 壁が呼吸する
     gravity: 0.05,                          // 中心に引きずり込まれる
-    collapse: 14,                           // ターンごとに中央の穴が広がる
-    spin: -0.5,
     holes:[{ x:0, y:0, r:200 },
-           { orb:0,           dist:940, x:940,  y:0,   r:120 },
-           { orb:Math.PI,     dist:940, x:-940, y:0,   r:120 }],
+           { x:940,  y:0, r:120 },
+           { x:-940, y:0, r:120 }],
     bumps:[{ x:0, y:-720, r:105 }, { x:0, y:720, r:105 },
            { x:-720, y:0, r:105 }, { x:720, y:0, r:105 }],
     ground:'#2a1020', moss:[130,30,60], grass:[150,50,80], lit:'rgba(255,90,140,.22)',
@@ -716,17 +714,16 @@ const STAGES = [
 
   { name:'渦の回廊', sub:'VORTEX RING', sides:0, rot:0, r:1440, fric:0.988,
     wave:{ kind:'flower', n:6, amp:0.1 },
-    spin: 0.55,
     holes:[{ x:0, y:0, r:170 },
-           { orb:0,            dist:820, x:820,  y:0,    r:140 },
-           { orb:Math.PI*2/3,  dist:820, x:-410, y:710,  r:140 },
-           { orb:Math.PI*4/3,  dist:820, x:-410, y:-710, r:140 }],
+           { x:820,  y:0,    r:140 },
+           { x:-410, y:710,  r:140 },
+           { x:-410, y:-710, r:140 }],
     ground:'#241833', moss:[110,60,150], grass:[130,80,180], lit:'rgba(200,140,255,.22)',
     rock:['#392a4a', 110, 70, 150], sky:['#2a1040','#160822','#05030a'], decor:'cave',
     accent:'#d79bff' },
 ];
-// 穴は崩落（collapse）と公転（spin）で書き換わるので、ステージ表からは必ず複製して使う。
-// 参照のまま使うと STAGES の原本が汚れ、同じステージを2回遊ぶと穴が広がったまま始まる。
+// 盤面は試合中いっさい動かない（壁の脈動・穴の公転・崩落は撤廃した。詳しくは AGENT.md）。
+// それでも STAGES の原本を対局に持ち込まないよう、穴は必ず複製して使う。
 const cloneHoles = st => st.holes.map(H => ({ ...H }));
 
 // ============ マッチ状態 =============================================
@@ -745,9 +742,6 @@ function newStageState(i) {
     ARENA: { x: 0, y: 0, r: st.r },
     HOLES: cloneHoles(st),
     FRICTION: st.fric,
-    holeSpin: 0,
-    stageT: 0,      // 脈動する壁の時間
-    pulseK: 1,      // 脈動の係数。radiusAt() が常に掛けるので 1 に戻し忘れると盤面が歪む
   };
 }
 
@@ -832,9 +826,8 @@ const COLORS = [
     side:['#8a6a4c', '#50392a', '#1d1410'], thick: 0.95, atk: 1.25, mob: 1.2, hp: 0.85 },
 ];
 
-let pulseFrame = 0;   // 脈動する壁の描き直しを間引くためのカウンタ（描画専用）
-
 // 向き θ での外周までの距離（円・多角形・星・歯車・花に対応）
+// ステージの形は試合中いっさい変わらないので、これは θ だけの純関数
 function radiusAt(th) {
   const w = M.ST.wave;
   if (w) {
@@ -848,13 +841,13 @@ function radiusAt(th) {
       const e = Math.min(u, 1 - u, Math.abs(u - 0.5)) * 12;
       k = k * Math.min(1, e) + (1 - Math.min(1, e)) * 0.5;
     }
-    return M.ARENA.r * (1 - w.amp + w.amp * k) * M.pulseK;
+    return M.ARENA.r * (1 - w.amp + w.amp * k);
   }
   const n = M.ST.sides;
-  if (!n) return M.ARENA.r * M.pulseK;
+  if (!n) return M.ARENA.r;
   const step = Math.PI * 2 / n;
   const a = ((th - M.ST.rot) % step + step) % step - step / 2;
-  return M.ARENA.r * Math.cos(Math.PI / n) / Math.cos(a) * M.pulseK;
+  return M.ARENA.r * Math.cos(Math.PI / n) / Math.cos(a);
 }
 
 // 外周の法線（極座標の接線から求めるので、どんな形でも使える）
@@ -881,8 +874,6 @@ const VIEW = { zoom: 1, panX: 0, panY: 0, tilt: 38 };   // tilt は水平から�
 
 // いまの俯瞰角で盤面がキャンバスにちょうど収まる焦点距離と中心を求める
 function fitCamera() {
-  const keep = M.pulseK;
-  M.pulseK = 1 + (M.ST.pulse ? M.ST.pulse.amp : 0);      // いちばん広がった状態で画角を決める
   const t = VIEW.tilt * Math.PI / 180;
   K1 = Math.cos(t); K2 = Math.sin(t);
   CAM.dist = CAM_L * K1; CAM.height = CAM_L * K2;
@@ -903,7 +894,6 @@ function fitCamera() {
   const m = 62;                    // まわりに背景が見える余白
   BASE_F  = Math.min((W - 2 * m) / (2 * nxMax), (H - 2 * m) / (nyMax - nyMin));
   BASE_OY = (H - BASE_F * (nyMax - nyMin)) / 2 - BASE_F * nyMin;
-  M.pulseK = keep;
 }
 
 function applyView() {
@@ -1043,9 +1033,7 @@ function makePieces() {
 }
 
 function reset() {
-  M.HOLES = cloneHoles(M.ST);        // 崩落・公転で変形した穴を初期状態へ戻す
-  M.holeSpin = 0;
-  resetPulse();                  // 脈動の位相も戻す（再戦が前の試合の続きにならないように）
+  M.HOLES = cloneHoles(M.ST);
   MATCH = freshMatch();
   gameRecorded = false;
   M.pieces = makePieces();
@@ -1064,7 +1052,6 @@ function reset() {
   // 秘薬は回数で持つ（0 は falsy なので、真偽で読んでいる既存コードはそのまま動く）
   M.potions = Array.from({ length: MAX_PLAYERS }, (_, p) => 1 + (RUN && p === 0 ? BLESS.potion : 0));
   M.stats = freshStats();
-  if (M.ST.collapse || M.ST.spin) buildStage();   // 穴の形が戻ったので床の絵も作り直す
   if (RUN) applyRunStart();                   // 治癒の泉・再起は各戦のはじめに効く
   updateRunHud();
   updateHud();
@@ -1562,15 +1549,7 @@ const SUBS = ['DWARVES', 'ELVES', 'ORCS', 'UNDEAD', 'GOBLINS', 'KNIGHTS', 'MAGES
 // ステージ切り替えのうち、勝敗に効く部分だけ。自動対戦はこちらだけを使う
 // （テクスチャ生成は 1600px の描画が3枚走るので、何十戦も回すと支配的になる）
 function applyStageRules(i) {
-  Object.assign(M, newStageState(i));   // 穴・半径・摩擦・脈動をまとめて初期状態に
-}
-
-// 脈動の時計を初期状態へ戻す。radiusAt() は ST.pulse の有無に関わらず pulseK を
-// 掛けるので、これを怠ると「終焉の大渦」を遊んだあと、次に選んだ別のステージの
-// 盤面サイズまで歪んだままになる
-function resetPulse() {
-  M.stageT = 0;
-  M.pulseK = 1;
+  Object.assign(M, newStageState(i));   // 穴・半径・摩擦をまとめて初期状態に
 }
 
 function applyStage(i) {
@@ -1752,10 +1731,7 @@ function buildSetup() {
       : (['円', '', '', '三角', '四角', '五角', '六角', '', '八角'][st.sides] || '円');
     const tags = [`${shape}・穴${st.holes.length}`];
     if (st.bumps)    tags.push('バンパー');
-    if (st.spin)     tags.push('回る穴');
-    if (st.pulse)    tags.push('脈動');
     if (st.gravity)  tags.push('引力');
-    if (st.collapse) tags.push('崩落');
     if (st.fric >= 0.99)      tags.push('滑る');
     else if (st.fric < 0.985) tags.push('重い');
     card.innerHTML = `<span class="ic">${stageIcon(st)}</span>`
@@ -2130,20 +2106,6 @@ const gameHooks = {
 
 
 // 見た目だけの更新（毎フレーム1回）
-// 穴が回るステージ：毎フレーム位置を更新
-function spinHoles(dt) {
-  M.stageT += dt;
-  if (M.ST.pulse) M.pulseK = 1 + M.ST.pulse.amp * Math.sin(M.stageT * M.ST.pulse.spd);
-  if (!M.ST.spin) return;
-  M.holeSpin += M.ST.spin * dt;
-  M.HOLES.forEach(H => {
-    if (H.orb == null) return;
-    const a = H.orb + M.holeSpin;
-    H.x = Math.cos(a) * H.dist;
-    H.y = Math.sin(a) * H.dist;
-  });
-}
-
 function updateCosmetics() {
   for (const b of M.pieces) {
     if (b.flash > 0) b.flash = Math.max(0, b.flash - 0.06);
@@ -3351,7 +3313,7 @@ function makeFloorTexture() {
     g.fillRect(R0()*S, R0()*S, 1.4, 1.4);
   }
   // 穴のまわりの土と根
-  for (const H of (M.ST.spin ? [] : M.HOLES)) {
+  for (const H of M.HOLES) {
     const cx = S/2 + H.x * FLOOR_TS, cy = S/2 + H.y * FLOOR_TS, hr = H.r * FLOOR_TS;
     const dirt = g.createRadialGradient(cx, cy, hr * 0.9, cx, cy, hr * 2.1);
     dirt.addColorStop(0, 'rgba(48,34,20,.85)'); dirt.addColorStop(1, 'rgba(48,34,20,0)');
@@ -5055,15 +5017,10 @@ function buildFloorView() {
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
   g.clearRect(0, 0, W, H);
 
-  // 脈動するステージは「いちばん広がった状態」で作っておく（縮んだぶんは描画時に切り取る）
-  const keepK = M.pulseK;
-  const maxK = 1 + (M.ST.pulse ? M.ST.pulse.amp : 0);
-  M.pulseK = maxK;
-
   g.save();
   g.beginPath(); tracePoints(arenaPoints(0, 240), false, g); g.clip();
 
-  const r = M.ARENA.r * maxK, ts = FLOOR_TEX / (2 * r), N = 150;
+  const r = M.ARENA.r, ts = FLOOR_TEX / (2 * r), N = 150;
   for (let i = 0; i < N; i++) {
     const y0 = -r + 2 * r * i / N, y1 = -r + 2 * r * (i + 1) / N;
     const top = project(0, y0, 0), bot = project(0, y1, 0);
@@ -5083,7 +5040,6 @@ function buildFloorView() {
   lg.addColorStop(1, 'rgba(0,0,0,.55)');
   g.fillStyle = lg; g.fillRect(0, 0, W, H);
   g.restore();
-  M.pulseK = keepK;
 }
 
 // ---- 視点操作（ホイールでズーム、何もない所をドラッグで平行移動） ----
@@ -5143,14 +5099,7 @@ function draw() {
 
   // 外壁（厚みのある石のリング）と床（どちらも視点変更時に作り置き）
   ctx.drawImage(wallView, 0, 0, W, H);
-  if (M.ST.pulse) {                       // 縮んだぶんだけ床も切り取る
-    ctx.save();
-    ctx.beginPath(); tracePoints(FLOOR, false); ctx.clip();
-    ctx.drawImage(floorView, 0, 0, W, H);
-    ctx.restore();
-  } else {
-    ctx.drawImage(floorView, 0, 0, W, H);
-  }
+  ctx.drawImage(floorView, 0, 0, W, H);
 
   ctx.save();
   ctx.beginPath(); tracePoints(FLOOR, false); ctx.clip();
@@ -5590,11 +5539,6 @@ function afterSettle() {
     M.turn = nextTurn();
     for (const b of M.pieces) b.lastHitBy = null;
   }
-  if (M.ST.collapse) {                       // 床が崩れていく
-    const H = M.HOLES[0];
-    H.r = Math.min(H.r + M.ST.collapse, M.ARENA.r * 0.5);
-    buildStage();
-  }
   M.phase = 'aim';
   updateHud();
   updateSpecialBtn();
@@ -5606,7 +5550,6 @@ function loop(now) {
   const dt = Math.min(0.06, lastT ? (now - lastT) / 1000 : 1 / 60);
   lastT = now;
   aiUpdate(now);
-  spinHoles(dt);
   if (M.phase === 'sim') {
     simTime += dt;
     if (simTime > 14) {                    // 念のための安全弁
@@ -5630,15 +5573,6 @@ function loop(now) {
   } else {
     simAcc = 0; simTime = 0;
     updateCosmetics();
-  }
-  if (M.ST.spin) {                        // 動く穴は毎フレーム描き直す
-    PIT   = M.HOLES.map(H => ringPoints(H.x, H.y, H.r, 0, 64));
-    PIT_B = M.HOLES.map(H => ringPoints(H.x, H.y, H.r * 0.72, -110, 64));
-  }
-  if (M.ST.pulse) {                       // 脈動する壁（毎フレームだと重いので間引く）
-    FLOOR = arenaPoints(0, 150);
-    RIM   = arenaPoints(WALL_H, 150);
-    if ((pulseFrame++ & 1) === 0) buildWallView();
   }
   const t0 = performance.now();
   draw();
@@ -5667,12 +5601,10 @@ function applyPlan(p) {
   return true;
 }
 
-// 駒が止まるまで物理を進める。穴の回転は 1 ステップあたり 1/SIM_RATE 秒ぶん
-// 進める（実プレイでは 1 フレーム dt 秒で SIM_RATE*dt ステップ進むので等価）
+// 駒が止まるまで物理を進める
 function simUntilRest(limit) {
   let n = 0;
   while (M.phase === 'sim' && n < limit) {
-    spinHoles(1 / SIM_RATE);
     stepPhysics(M.pieces, M.shooter, gameHooks);
     stepArrow();
     stepBomb();
