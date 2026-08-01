@@ -55,7 +55,7 @@ copy(__ohajiki.selfplaySuite(1, 50).map(r =>
 
 | 分類 | 中身 |
 |---|---|
-| ステージ | `stageIdx` `ST` `ARENA` `HOLES` `FRICTION` `holeSpin` `stageT` `pulseK` |
+| ステージ | `stageIdx` `ST` `ARENA` `HOLES` `FRICTION` |
 | 対戦条件 | `players` `factions` `aiLevel` |
 | 進行 | `pieces` `turn` `phase` `winner` `shooter` `armed` `arrow` `bomb` `extraShot` `started` `potions` `stats` |
 | 乱数 | `rng` |
@@ -65,7 +65,7 @@ copy(__ohajiki.selfplaySuite(1, 50).map(r =>
 サーバーもこの仕組みで対局を回す前提。
 
 グローバルに残っているのは**画面のための状態だけ**で、サーバーには持っていかない:
-`effects` `drag` `hoverId` `activeId` `turnFade` `drawMs` `pulseFrame` `ai` `MODE` `RUN` `MATCH` `SAVE`。
+`effects` `drag` `hoverId` `activeId` `turnFade` `drawMs` `ai` `MODE` `RUN` `MATCH` `SAVE`。
 
 ### 守ること
 
@@ -126,12 +126,14 @@ done
 
 同じ形の間違いを繰り返さないための記録。
 
-- **`HOLES = ST.holes` の参照コピー**（修正済み）。崩落と公転が `STAGES` の原本を破壊し、
-  同じステージを 2 回遊ぶと穴が広がったまま始まった。ステージ表からは必ず `cloneHoles()` で複製する。
-- **`stageT` / `pulseK` のリセット漏れ**（修正済み）。`radiusAt()` はステージの種類に関わらず
-  `pulseK` を掛けるのに、書き換えるのは脈動ステージだけだった。「終焉の大渦」を遊ぶと
-  次のステージの盤面半径が最大 ±7% ずれた。`resetPulse()` を `applyStageRules()` と
-  `reset()` の両方から呼んでいる。
+- **動くステージそのもの**（撤廃済み）。壁の脈動（`pulse`）・穴の公転（`spin`）・
+  ターンごとの崩落（`collapse`）は、`HOLES` が `STAGES` の原本を破壊する事故、
+  `pulseK` のリセット漏れで次のステージの盤面半径がずれる事故を続けて起こしたうえ、
+  **構え中に穴が駒の下へ滑り込んでも落ちない**（落下判定は `stepPhysics` の中にしかなく、
+  `aim` フェーズでは走らない）という直しにくいバグを残した。オンライン化では
+  「盤面は座標の同期がいらない静的なデータ」であることが実装をいちばん楽にする。
+  **盤面を試合中に動かす仕掛けは今後いっさい足さない。**
+  それでも `HOLES` は `cloneHoles()` で複製して持つ（`STAGES` を対局に持ち込まないため）。
 - **当たり判定を盤面座標で測っていた**（修正済み）。コマは厚み 22 の円盤の上に背丈 104 の
   人物が立っていて、見た目の重心は床よりずっと上。床へ逆投影して判定すると、
   人物を狙うほど外れる。判定は画面座標で行う。
