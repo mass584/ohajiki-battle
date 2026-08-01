@@ -1,0 +1,14 @@
+{
+  "name": "@ohajiki/sim",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "おはじきバトルの sim を DOM 無しの Node で回すヘッドレス host と回帰テスト",
+  "main": "src/headless.mjs",
+  "exports": {
+    ".": "./src/headless.mjs"
+  },
+  "scripts": {
+    "test": "node test/selfplay.js"
+  }
+}

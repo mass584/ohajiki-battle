@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "おはじきバトル",
+    "slug": "ohajiki-battle",
+    "version": "1.0.0",
+    "orientation": "default",
+    "scheme": "ohajiki",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0c120e",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0c120e"
+    },
+    "assetBundlePatterns": ["assets/**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "io.github.mass584.ohajikibattle",
+      "infoPlist": {
+        "UIRequiresFullScreen": true
+      }
+    },
+    "android": {
+      "package": "io.github.mass584.ohajikibattle"
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": false
+        }
+      ]
+    ]
+  }
+}

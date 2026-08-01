@@ -26,6 +26,13 @@ node_modules/
 npm-debug.log*
 yarn-error.log*
 
+# モノレポ / モバイル（Expo）
+.expo/
+apps/mobile/assets/game.html   # scripts/inline.mjs が生成する同梱ゲーム（再生成できるのでコミットしない）
+apps/*/ios/
+apps/*/android/
+apps/*/dist/
+
 # 手元だけの作業ファイル
 *.local
 *.local.*

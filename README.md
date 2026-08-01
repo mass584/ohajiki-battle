@@ -70,6 +70,20 @@ python3 -m http.server 8731
 右上の 📜 から、通算成績・**制覇表**（ステージ × 陣営 × CPU の強さ の全 192 マス）・
 **実績**・ステージ別の自己ベストを見られます。記録はこの端末のブラウザに保存されます。
 
+## ネイティブアプリ（iOS / Android）
+
+この自己完結 HTML を **WebView で包んだネイティブアプリ**をモノレポとして同梱しています。
+
+```
+packages/sim/   sim（物理・AI・ルール）を DOM 無しの Node で回すヘッドレス host + 回帰テスト
+apps/mobile/    Expo + react-native-webview のネイティブアプリ（ゲーム本体は無改造で同梱）
+scripts/        index.html を「自己完結 1 枚 HTML」に畳む inline スクリプト
+index.html      ゲーム本体（Web 版 & Pages のまま。sim の唯一の真実）
+```
+
+- モバイル: [`apps/mobile/README.md`](apps/mobile/README.md)
+- ヘッドレス sim / 回帰テスト: [`packages/sim/README.md`](packages/sim/README.md)（`node packages/sim/test/selfplay.js`）
+
 ## 開発
 
 コードの構造・改造するときの約束・回帰テストのやりかたは [AGENT.md](AGENT.md) を参照してください。
