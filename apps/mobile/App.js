@@ -19,6 +19,22 @@ const BASE_URL = 'https://ohajiki.local/';
 // 盤面の暗い背景に合わせる（ロード中やセーフエリア外の色）
 const BG = '#0c120e';
 
+// WebView は viewport に user-scalable=no / maximum-scale が無いと「ダブルタップで拡大」が
+// 有効なままになる。盤面の canvas は touch-action:none（index.html:36）なので免れているが、
+// HUD のボタンには指定が無く、2 回叩くとページごと拡大してしまう。
+// ゲーム本体は無改造の方針なので、アプリ側で CSS を被せて塞ぐ。
+// touch-action:manipulation はダブルタップ拡大とタップ遅延だけを止め、
+// 通常のタップ・ドラッグ・ゲーム自前のピンチはそのまま残す。
+const DISABLE_DOUBLE_TAP_ZOOM = `
+  (function () {
+    var s = document.createElement('style');
+    // canvas は元の touch-action:none を維持する（* に負けない型セレクタだが明示しておく）
+    s.textContent = '*{touch-action:manipulation}canvas{touch-action:none}';
+    (document.head || document.documentElement).appendChild(s);
+  })();
+  true;
+`;
+
 export default function App() {
   const [html, setHtml] = useState(null);
   const webRef = useRef(null);
@@ -87,6 +103,7 @@ export default function App() {
               originWhitelist={['*']}
               source={{ html, baseUrl: BASE_URL }}
               // 描画・入力
+              injectedJavaScript={DISABLE_DOUBLE_TAP_ZOOM}
               javaScriptEnabled
               domStorageEnabled                // Android: localStorage を有効化
               allowFileAccess
