@@ -5436,7 +5436,11 @@ function drawPiece(b) {
     const gp = project(b.x, b.y, 1.5);
     const gr = rad * gp.s * (1.75 + k * 0.18);
     ctx.beginPath(); ctx.ellipse(gp.x, gp.y, gr, gr * K2, 0, 0, Math.PI*2);
-    ctx.strokeStyle = c.main; ctx.lineWidth = 3; ctx.shadowColor = c.glow;
+    // 白は「いま触れる」合図に統一する。チームカラーは所属を示すのに使うので、
+    // 選択中の輪をチームカラーにすると隊長の輪と役割がぶつかる
+    // ベタ白だと輪だけが浮いて駒より目立つので、少し透かして床になじませる
+    ctx.strokeStyle = 'rgba(255,255,255,.62)'; ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(255,255,255,.5)';
     ctx.shadowBlur = 14; ctx.stroke(); ctx.shadowBlur = 0;
     // 天面を白く縁取ると駒が一回り大きく見えるので、選択中の合図は
     // 足元の輪と頭上の三角マーカーだけに任せる
