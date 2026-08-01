@@ -197,12 +197,25 @@
 
   /* 下段右：操作パネル */
   .controls{
-    right:14px; bottom:14px;
+    right:14px; bottom:74px;
     display:flex; flex-direction:column; align-items:stretch; gap:8px;
     background:var(--panel); border:1px solid var(--line); border-radius:12px;
     padding:11px 13px; min-width:236px;
     backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
   }
+  /* 常時表示のズーム操作。スマホ・タブレットでも押しやすい大きさにする */
+  .zoomctl{
+    right:14px; bottom:14px;
+    display:flex; flex-direction:row; gap:8px;
+  }
+  .zoomctl button{
+    flex:0 0 auto; width:48px; height:48px; padding:0;
+    font-size:24px; line-height:1; font-weight:600;
+    border-radius:12px; background:var(--panel); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  }
+  .zoomctl button:disabled{opacity:.38; cursor:default}
   .controls .panel-body{display:flex; flex-direction:column; gap:8px}
   .controls .row{display:flex; align-items:center; gap:9px; font-size:11.5px; color:var(--dim)}
   .controls .row.btns{gap:7px}
@@ -495,6 +508,11 @@
       </div>
     </div>
   </div>
+
+  <div class="overlay zoomctl">
+    <button id="zoomOut" aria-label="ズームアウト" title="ズームアウト (−)">－</button>
+    <button id="zoomIn" aria-label="ズームイン" title="ズームイン (＋)">＋</button>
+  </div>
 </div>
 
 <dialog id="result">
@@ -617,6 +635,7 @@
     <h3>視点</h3>
     ホイール：ズーム／床をドラッグ、または <kbd>←↑↓→</kbd> <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>：視点移動
     （<kbd>Shift</kbd> を押しながらで大きく動きます）<br>
+    スマホ・タブレット：<b>2本指のピンチ</b>で拡大縮小、右下の <b>＋ − ボタン</b>でも拡大縮小できます<br>
     <kbd>Shift</kbd>+ホイール、または <kbd>Q</kbd> <kbd>E</kbd>：俯瞰角<br>
     <kbd>0</kbd>：視点をリセット<br>
     <kbd>Esc</kbd>：引き絞りを取り消す（発射せずに構え直せます）
@@ -1354,11 +1373,33 @@ function pieceAt(sx, sy) {
 
 let panDrag = null;
 
+// スマホ・タブレットのピンチ操作。押している指をすべて覚えておき、
+// 2 本になったらその間隔でズーム、中点の移動で平行移動する
+const pointers = new Map();       // pointerId → { x, y }
+let pinch = null;                 // { dist, zoom0, cx, cy, panX0, panY0 }
+
+function startPinch() {
+  const [a, b] = [...pointers.values()];
+  pinch = {
+    dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
+    zoom0: VIEW.zoom,
+    cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2,
+    panX0: VIEW.panX, panY0: VIEW.panY,
+  };
+}
+
 cv.addEventListener('pointerdown', ev => {
   const c = toCanvas(ev);
+  pointers.set(ev.pointerId, c);
+  try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* 合成イベント等では無視 */ }
+  if (pointers.size >= 2) {                       // 2 本目が触れたらピンチへ切り替える
+    if (drag) cancelDrag();                       // 引き絞りかけは発射せずに戻す
+    panDrag = null;
+    if (pointers.size === 2) startPinch();
+    return;
+  }
   const canAim = M.phase === 'aim' && !isAI(M.turn) && ev.button === 0;
   const b = canAim ? pieceAt(c.x, c.y) : null;
-  try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* 合成イベント等では無視 */ }
   if (b) {
     if (activeId !== b.id) {                     // 1クリック目は選択だけ（誤操作防止）
       activeId = b.id;
@@ -1377,6 +1418,17 @@ cv.addEventListener('pointerdown', ev => {
 
 cv.addEventListener('pointermove', ev => {
   const c = toCanvas(ev);
+  if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, c);
+  if (pinch && pointers.size >= 2) {
+    const [a, b] = [...pointers.values()];
+    const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+    VIEW.zoom = Math.min(3.5, Math.max(0.6, pinch.zoom0 * dist / pinch.dist));
+    VIEW.panX = pinch.panX0 + (cx - pinch.cx);   // 中点の移動ぶんは平行移動に回す
+    VIEW.panY = pinch.panY0 + (cy - pinch.cy);
+    applyView();
+    return;
+  }
   if (panDrag) {
     VIEW.panX = panDrag.x0 + (c.x - panDrag.sx);
     VIEW.panY = panDrag.y0 + (c.y - panDrag.sy);
@@ -1445,7 +1497,17 @@ function release() {
   sfxFlick(d / MAX_PULL, special);
   updateHud();
 }
-function endPointer() {
+function endPointer(ev) {
+  pointers.delete(ev.pointerId);
+  if (pinch) {                                    // ピンチ中に指が離れたとき
+    if (pointers.size < 2) pinch = null;
+    // 1 本だけ残ったら、その指でそのまま平行移動できるよう起点を取り直す
+    if (pointers.size === 1) {
+      const [only] = [...pointers.values()];
+      panDrag = { sx: only.x, sy: only.y, x0: VIEW.panX, y0: VIEW.panY };
+    }
+    return;
+  }
   if (panDrag) { panDrag = null; cv.style.cursor = 'grab'; return; }
   release();
 }
@@ -1519,6 +1581,13 @@ document.getElementById('toggleBgm').addEventListener('click', () => {
 document.getElementById('resetView').addEventListener('click', () => {
   VIEW.zoom = 1; VIEW.panX = 0; VIEW.panY = 0; setTilt(38);
 });
+// 右下のズームボタン（キーボードの +/- と同じ刻み）
+function stepZoom(factor) {
+  VIEW.zoom = Math.min(3.5, Math.max(0.6, VIEW.zoom * factor));
+  applyView();
+}
+document.getElementById('zoomIn').addEventListener('click', () => stepZoom(1.15));
+document.getElementById('zoomOut').addEventListener('click', () => stepZoom(1 / 1.15));
 document.getElementById('tilt').addEventListener('input', ev => setTilt(+ev.target.value));
 
 // ---- 画面わきのパネルの開閉 -------------------------------------------
