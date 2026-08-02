@@ -19,6 +19,21 @@
   <circle cx='10.9' cy='10.9' r='3.4' fill='%234aa8ff'/>
   <circle cx='21.1' cy='21.1' r='3.4' fill='%23ff5c5c'/>
 </svg>">
+<!-- pwa:start — ホーム画面に追加したときに全画面・オフラインで起動するための宣言。
+     scripts/inline.mjs は同梱版（WebView 用）を作るときにこのブロックを外す。
+     アプリ内には manifest も sw.js も存在せず、404 を踏むだけなので。
+     パスはすべて相対にする。GitHub Pages はサブパスで配信されるため、
+     '/manifest.json' と書くとサイト直下を見に行って 404 になる。
+     ステータスバーは black（不透明）。black-translucent にすると HUD が
+     ノッチの下へ潜るので、盤面の余白計算を足さずに済むこちらを選ぶ -->
+<meta name="theme-color" content="#0c120e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="おはじきバトル">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<!-- pwa:end -->
 <style>
   :root{
     --panel:rgba(14,20,16,.82);
@@ -5881,5 +5896,16 @@ reset();
 loop();                     // 盤面はタイトルのうしろで動かしておく
 })();
 </script>
+<!-- pwa:start — Service Worker の登録。オフライン起動のためだけに使う。
+     ★ここを <head> へ動かさないこと。sim のヘッドレス実行（packages/sim/src/headless.mjs）は
+     「最初に現れる <script> の中身」をゲーム本体として取り出すので、前に置くと
+     こちらが本体として評価されてテストが落ちる。
+     file:// や WebView 同梱版では登録できない／要らないので、失敗は黙って捨てる -->
+<script>
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+  }
+</script>
+<!-- pwa:end -->
 </body>
 </html>

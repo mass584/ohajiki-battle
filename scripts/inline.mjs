@@ -34,6 +34,12 @@ html = html.replace(moduleTag, (whole, src) => {
   return `<script type="module">\n${code}\n</script>`;
 });
 
+// PWA の宣言（manifest / apple-touch-icon / Service Worker の登録）を落とす。
+// 同梱版はアプリの WebView が baseUrl 'https://ohajiki.local/' で読むだけなので、
+// これらの相対パスは何処にも実体が無い。登録の失敗は握り潰しているとはいえ、
+// 要らない 404 を踏ませない。
+html = html.replace(/[ \t]*<!--\s*pwa:start[\s\S]*?pwa:end\s*-->\n?/g, '');
+
 // 外部 CSS（現状は無し。将来のために対応だけ入れておく）
 const linkTag = /<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["'](\.[^"']+)["'][^>]*>/g;
 html = html.replace(linkTag, (whole, href) => {

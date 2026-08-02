@@ -70,6 +70,23 @@ python3 -m http.server 8731
 右上の 📜 から、通算成績・**制覇表**（ステージ × 陣営 × CPU の強さ の全 192 マス）・
 **実績**・ステージ別の自己ベストを見られます。記録はこの端末のブラウザに保存されます。
 
+## ホーム画面に追加して遊ぶ（PWA）
+
+ストアを通さずに、**アプリのように**インストールできます。追加は無料で、
+オフラインでも起動します。
+
+- **iPhone / iPad**: Safari で開き、共有ボタン → 「ホーム画面に追加」
+- **Android**: Chrome で開き、メニュー → 「アプリをインストール」
+- **PC**: Chrome / Edge のアドレスバー右のインストールアイコン
+
+追加すると、ブラウザの UI が無い全画面で起動し、機内モードでも遊べます。
+
+> **記録の置き場所に注意。** 保存はブラウザごと・オリジンごとです。iOS では
+> ホーム画面のアプリと Safari のタブで保存場所が分かれるため、**Safari で遊んだ
+> 記録はホーム画面版へは引き継がれません**（追加したあと遊び直すことになります）。
+> 逆に、ホーム画面に追加しておくと Safari の保存期限（しばらく開かないと消える）の
+> 対象から外れるので、記録は長持ちします。
+
 ## ネイティブアプリ（iOS / Android）
 
 この自己完結 HTML を **WebView で包んだネイティブアプリ**をモノレポとして同梱しています。
@@ -77,8 +94,11 @@ python3 -m http.server 8731
 ```
 packages/sim/   sim（物理・AI・ルール）を DOM 無しの Node で回すヘッドレス host + 回帰テスト
 apps/mobile/    Expo + react-native-webview のネイティブアプリ（ゲーム本体は無改造で同梱）
-scripts/        index.html を「自己完結 1 枚 HTML」に畳む inline スクリプト
+scripts/        index.html を「自己完結 1 枚 HTML」に畳む inline スクリプト / アイコン生成
 index.html      ゲーム本体（Web 版 & Pages のまま。sim の唯一の真実）
+manifest.json   PWA の宣言（名前・アイコン・全画面表示）
+sw.js           オフライン起動のための Service Worker（キャッシュのみ）
+icons/          ホーム画面用アイコン。scripts/icons.mjs が生成する成果物
 ```
 
 - モバイル: [`apps/mobile/README.md`](apps/mobile/README.md)
