@@ -1,0 +1,35 @@
+{
+  "id": "./",
+  "name": "おはじきバトル",
+  "short_name": "おはじき",
+  "description": "盤上のおはじきを弾いて相手を穴に落とす、ターン制の対戦ゲーム。オフラインで遊べます。",
+  "lang": "ja",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c120e",
+  "theme_color": "#0c120e",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

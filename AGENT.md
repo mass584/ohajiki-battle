@@ -6,8 +6,19 @@
 
 - **`index.html` 1 ファイル**（約 5,900 行）。依存パッケージもビルドもない。
   JS はすべて 1 つの IIFE の中にあり、`'use strict'`。
+  **ゲーム本体の `<script>` は、この HTML の中で最初に現れる `<script>` でなければならない。**
+  ヘッドレス sim（`packages/sim/src/headless.mjs`）も AGENT.md の構文チェックも、
+  「最初の `<script>`」を本体として切り出す。前に別の `<script>` を足すと両方が壊れる。
 - 外部画像を持たない。キャラも地面も紋章もファビコンも、その場で Canvas / SVG で描く。
+  唯一の例外が `icons/` の PNG で、これは PWA（ホーム画面に追加）の manifest と
+  apple-touch-icon が PNG しか受け付けないため。素材ではなく、ファビコンと同じ図形を
+  `scripts/icons.mjs` がその場でラスタライズした**成果物**（`pnpm build:icons` で作り直せる）。
 - 音は Web Audio の合成音のみ。音源ファイルは無い。
+- **PWA（ホーム画面に追加）に対応している。** `manifest.json` / `sw.js` / `icons/` の 3 つ。
+  `index.html` の中では `<!-- pwa:start -->`〜`<!-- pwa:end -->` で囲ってあり、
+  同梱版（`scripts/inline.mjs` が作る WebView 用）ではこのブロックごと外れる。
+  パスはすべて相対にすること。GitHub Pages はサブパス配信なので絶対パスだと 404 になる。
+  `sw.js` がキャッシュするファイルを増減したら、`CACHE` の版（`ohajiki-vN`）を上げる。
 - **オンライン対戦とグローバルランキングへ向けた改造の途中**。詳細は下の「進行中の設計」。
 
 ## 動かす

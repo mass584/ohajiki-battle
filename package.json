@@ -7,6 +7,7 @@
   "scripts": {
     "test:sim": "node packages/sim/test/selfplay.js",
     "build:standalone": "node scripts/inline.mjs",
+    "build:icons": "node scripts/icons.mjs",
     "serve:web": "python3 -m http.server 8731"
   },
   "license": "SEE LICENSE IN LICENSE"
